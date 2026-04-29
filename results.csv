@@ -1,0 +1,4 @@
+data_hora,produto,elasticidade-estimada,melhor-preço-otimização,lucro-otimizacao,preço-ia-sugerido,lucro-ia-sugerido,preço-aplicado-otimização,demanda-estimada,receita-estimada,lucro-esperado
+2026-04-29 08:37:42,X,-2.87,77,1194.55,75.0,1192.99,77,44.24,3406.68,1194.55
+2026-04-29 08:37:44,Y,-3.19,73,1102.55,80.0,1073.94,73,47.94,3499.38,1102.55
+2026-04-29 08:37:46,Z,-5.03,62,2409.13,85.0,1438.6,62,200.76,12447.2,2409.13
