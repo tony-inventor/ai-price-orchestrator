@@ -1,14 +1,11 @@
 from __future__ import annotations
-
 from datetime import datetime
 from pathlib import Path
-
 import pandas as pd
 
 from ai_module import sugerir_preco_com_ia
 from pricing_engine import carregar_vendas, otimizar_preco, treinar_modelo
 from simulation import simular
-
 
 ROOT = Path(__file__).resolve().parent
 DATA_DIR = ROOT / "data"
@@ -22,7 +19,14 @@ def salvar_decisao(produto: str, preco: int, receita: float, lucro: float) -> No
         df = pd.read_csv(DECISIONS_FILE)
     else:
         df = pd.DataFrame(
-            columns=["data", "produto", "preco_sugerido", "preco_aplicado", "receita", "lucro"]
+            columns=[
+                "data",
+                "produto",
+                "preco_sugerido",
+                "preco_aplicado",
+                "receita",
+                "lucro",
+            ]
         )
 
     nova_linha = {
@@ -45,21 +49,30 @@ def main() -> None:
 
     for produto in df_all["produto"].unique():
         produto_df = df_all[df_all["produto"] == produto]
-        a, b = treinar_modelo(produto_df)
+
+        # Agora treinar_modelo retorna 3 valores: intercepto, b1 (próprio), b2 (concorrente)
+        a, b1, b2 = treinar_modelo(produto_df)
+
         preco_concorrente = float(produto_df["preco_concorrente"].mean())
         demanda_media = float(produto_df["quantidade"].mean())
 
-        melhor_preco, melhor_lucro = otimizar_preco(custo, a, b, preco_concorrente)
+        # Otimizar preço agora considera b1, b2 e o preço do concorrente
+        melhor_preco, melhor_lucro = otimizar_preco(custo, a, b1, b2, preco_concorrente)
+
         preco_ia = sugerir_preco_com_ia(
             custo,
             preco_concorrente,
             demanda_media,
         )
-        receita_estimad, demanda_estimada = simular(melhor_preco, a, b)
+
+        # Simular agora requer o preço do concorrente para o modelo de elasticidade cruzada
+        receita_estimad, demanda_estimada = simular(
+            melhor_preco, a, b1, b2, preco_concorrente
+        )
         lucro_consistente = receita_estimad - (custo * demanda_estimada)
 
         # Simular preço sugerido pela IA
-        receita_ia, demanda_ia = simular(preco_ia, a, b)
+        receita_ia, demanda_ia = simular(preco_ia, a, b1, b2, preco_concorrente)
         lucro_ia = receita_ia - (custo * demanda_ia)
 
         # Escolher o preço com maior lucro
@@ -81,26 +94,28 @@ def main() -> None:
             {
                 "data_hora": timestamp,
                 "produto": produto,
-                "elasticidade-estimada": round(b, 2),
+                "elasticidade-propria": round(b1, 2),
+                "elasticidade-cruzada": round(b2, 2),
                 "melhor-preço-otimização": melhor_preco,
                 "lucro-otimizacao": round(lucro_consistente, 2),
                 "preço-ia-sugerido": preco_ia,
                 "lucro-ia-sugerido": round(lucro_ia, 2),
-                "preço-aplicado-otimização": preco_final,
+                "preço-aplicado": preco_final,
+                "metodo-escolhido": metodo,
                 "demanda-estimada": round(demanda_final, 2),
                 "receita-estimada": round(receita_final, 2),
                 "lucro-esperado": round(lucro_final, 2),
             }
         )
 
-        print("=== AI PRICE ORCHESTRATOR ===")
+        print("=== AI PRICE ORCHESTRATOR (V2 - Elasticidade Cruzada) ===")
         print(f"Produto: {produto}")
-        print(f"Elasticidade estimada: {b:.2f}")
-        print(f"Melhor preço (otimização): {melhor_preco} (lucro: {lucro_consistente:.2f})")
+        print(f"Elasticidade Própria: {b1:.2f} | Cruzada: {b2:.2f}")
+        print(
+            f"Melhor preço (otimização): {melhor_preco} (lucro: {lucro_consistente:.2f})"
+        )
         print(f"Preço IA sugerido: {preco_ia} (lucro: {lucro_ia:.2f})")
         print(f"Preço aplicado ({metodo}): {preco_final}")
-        print(f"Demanda estimada: {demanda_final:.2f}")
-        print(f"Receita estimada: {receita_final:.2f}")
         print(f"Lucro esperado: {lucro_final:.2f}\n")
 
         salvar_decisao(produto, preco_final, receita_final, lucro_final)
